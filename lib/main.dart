@@ -35,16 +35,21 @@ class GamePlay extends StatefulWidget {
 
 class _GamePlayState extends State<GamePlay>
     with SingleTickerProviderStateMixin {
+  bool _isPaused = false;
+
   int _score = 0;
   double bucketX = 0.0;
   double bucketWidth = 100.0;
-  double bucketHeight = 10.0;
+  double bucketHeight = 50.0;
 
   List<Ball> _balls = [];
-  late Timer _ballSpawnTimer;
-  late Ticker ticker;
+  double _nextBallSpawnTime = 0.0;
 
+  late Ticker ticker;
+  Duration? _lastTickTime;
   final Random _rng = Random();
+
+  BoxConstraints _gameAreaSize = BoxConstraints();
 
   @override
   void initState() {
@@ -57,8 +62,6 @@ class _GamePlayState extends State<GamePlay>
     // TODO: Ticker, update state of ball, check for collision with bucket
     ticker = Ticker(_onTick);
     ticker.start();
-    // Randomize ball spawn
-    _createNextSpawnTimer();
   }
 
   @override
@@ -67,18 +70,39 @@ class _GamePlayState extends State<GamePlay>
       appBar: AppBar(title: Text(widget.title)),
       body: Column(
         children: [
-          Row(children: [Text('Score: $_score')]),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Score: $_score', style: TextStyle(fontSize: 20)),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => togglePause(),
+                      icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           Expanded(
-            child: GestureDetector(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                _gameAreaSize = constraints;
+                return GestureDetector(
               onHorizontalDragUpdate: _onHorizontalDragUpdate,
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: Container(color: Colors.transparent),
                   ), // Make gesture work on all part of the map.
-                  ..._renderObjects(),
+                  ..._renderObjects(constraints),
                 ],
               ),
+                );
+              },
             ),
           ),
         ],
@@ -88,61 +112,71 @@ class _GamePlayState extends State<GamePlay>
 
   @override
   void dispose() {
-    _ballSpawnTimer.cancel();
     ticker.dispose();
     super.dispose();
   }
 
   void _onTick(Duration duration) {
     print('ticker._onTick');
+    double deltaTime = 0;
+    if (_lastTickTime != null) {
+      deltaTime = (duration.inMilliseconds - _lastTickTime!.inMilliseconds)
+          .toDouble();
+    }
+    setState(() {
+      _updateObjectPosition();
+      _updateSpawnTimer(deltaTime);
+    });
+    _lastTickTime = duration;
+  }
+
+  void _updateObjectPosition() {
     double screenHeight = _getScreenSize().height;
-    double bucketTop = screenHeight * 0.9;
+    double bucketTop = _gameAreaSize.maxHeight * 0.9;
     double bucketLeft = bucketX;
     double bucketRight = bucketX + bucketWidth;
-    setState(() {
-      for (var ball in _balls) {
-        ball.updatePosition();
-        // TODO: Check collision with bucket, if so, remove ball add score
-        double previousBallBottom = ball.previousPosition[1] + ball.size[1];
-        double currentBallBottom = ball.position[1] + ball.size[1];
-        bool ballBottomCrossBucketTop = (
-          previousBallBottom <= bucketTop && currentBallBottom > bucketTop
-        );
-        double ballLeft = ball.position[0];
-        double ballRight = ballLeft + ball.size[0];
-        bool ballTouchBucketSide = (
-          bucketLeft < ballRight && bucketRight > ballLeft
-        );
-        if (ballBottomCrossBucketTop && ballTouchBucketSide) {
-          _score++;
-          _balls.remove(ball);
-        }
-        if (ball.position[1] > screenHeight) {
-          _balls.remove(ball);
-        }
+    for (var ball in _balls) {
+      ball.updatePosition();
+      // TODO: Check collision with bucket, if so, remove ball add score
+      double previousBallBottom = ball.previousPosition[1] + ball.size[1];
+      double currentBallBottom = ball.position[1] + ball.size[1];
+      bool ballBottomCrossBucketTop =
+          (previousBallBottom <= bucketTop && currentBallBottom > bucketTop);
+      double ballLeft = ball.position[0];
+      double ballRight = ballLeft + ball.size[0];
+      bool ballTouchBucketSide =
+          (bucketLeft < ballRight && bucketRight > ballLeft);
+      // Bucket Collision
+      if (ballBottomCrossBucketTop && ballTouchBucketSide) {
+        _score++;
+        _balls.remove(ball);
       }
-    });
+      // Ball out of screen
+      if (ball.position[1] > screenHeight) {
+        _balls.remove(ball);
+      }
+    }
   }
 
-  void _createNextSpawnTimer() {
-    int nextTime = 1000 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300);
-    _ballSpawnTimer = Timer(Duration(milliseconds: nextTime), _onSpawnTimer);
+  void _updateSpawnTimer(double deltaTime) {
+    _nextBallSpawnTime -= deltaTime;
+    if (_nextBallSpawnTime <= 0) {
+      _spawnBall();
+      _nextBallSpawnTime =
+          1000 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300).toDouble();
+    }
   }
 
-  void _onSpawnTimer() {
-    print('ballSpawnTimer');
-    setState(() {
-      double ballWidth = 10;
-      double x = _rng.nextDouble() * (_getScreenSize().width - ballWidth);
-      double speed = 1 + (_rng.nextBool() ? 1 : -1) * (_rng.nextDouble() / 2);
-      _balls.add(
-        Ball(Colors.black, [x, 0.05 * _getScreenSize().height], [0, speed]),
-      );
-    });
-    _createNextSpawnTimer();
+  void _spawnBall() {
+    double ballWidth = 10;
+    double x = _rng.nextDouble() * (_getScreenSize().width - ballWidth);
+    double speed = 1 + (_rng.nextBool() ? 1 : -1) * (_rng.nextDouble() / 2);
+    _balls.add(
+      Ball(Colors.black, [x, 0.05 * _getScreenSize().height], [0, speed]),
+    );
   }
 
-  List<Widget> _renderObjects() {
+  List<Widget> _renderObjects(BoxConstraints constraints) {
     List<Widget> ballWidgets = _balls
         .map(
           (ball) => Positioned(
@@ -161,7 +195,7 @@ class _GamePlayState extends State<GamePlay>
         .toList();
     Widget bucket = Positioned(
       left: bucketX,
-      top: _getScreenSize().height * 0.9,
+      top: constraints.maxHeight * 0.9,
       child: Container(
         width: bucketWidth,
         height: bucketHeight,
@@ -179,6 +213,17 @@ class _GamePlayState extends State<GamePlay>
         0,
         _getScreenSize().width - bucketWidth,
       );
+    });
+  }
+
+  void togglePause() {
+    setState(() {
+      _isPaused = !_isPaused;
+      if (_isPaused) {
+        ticker.stop();
+      } else {
+        ticker.start();
+      }
     });
   }
 
