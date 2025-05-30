@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,13 +34,13 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const GamePlay(title: 'Game Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class GamePlay extends StatefulWidget {
+  const GamePlay({super.key, required this.title});
 
   // This widget is the home page of your application. It is stateful, meaning
   // that it has a State object (defined below) that contains fields that affect
@@ -50,73 +54,113 @@ class MyHomePage extends StatefulWidget {
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<GamePlay> createState() => _GamePlayState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _GamePlayState extends State<GamePlay> with SingleTickerProviderStateMixin {
+  // TODO: Lock bucket y position, and change x position based on input
+  double bucketX = 0.0;
+  double bucketWidth = 100.0;
+  double bucketHeight = 10.0;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+
+  // TODO: Ball list to remember the state of all the balls
+  // TODO: Timers to create ball
+  // TODO: Add ticker for ball movement
+  List<Ball> _balls = [];
+  late Timer _ballSpawnTimer;
+  late Ticker ticker;
+
+  final Random _rng = Random();
+
+
+  @override void initState() {
+    print('initState');
+    // TODO: implement initState
+    super.initState();
+    // TODO: Ticker, update state of ball, check for collision with bucket
+    ticker = Ticker(_onTick);
+    ticker.start();
+    // Randomize ball spawn
+    _createNextSpawnTimer();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      body: GestureDetector(
+        onHorizontalDragUpdate: (details) {
+        },
+        child: Stack(
+          children: _renderObjects(),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  @override
+  void dispose() {
+    _ballSpawnTimer.cancel();
+    ticker.dispose();
+    super.dispose();
+  }
+
+  void _onTick(Duration duration) {
+    print('ticker._onTick');
+    setState(() {
+      for (var ball in _balls) {
+        ball.updatePosition();
+        // TODO: Check collision with bucket, if so, remove ball add score
+        // TODO: Check if ball is out of bounds, if so, remove ball
+      }
+    });
+  }
+
+  void _createNextSpawnTimer() {
+    int nextTime = 500 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300);
+    _ballSpawnTimer = Timer(Duration(milliseconds: nextTime), _onSpawnTimer);
+  }
+
+  void _onSpawnTimer() {
+    print('ballSpawnTimer');
+    setState(() {
+      _balls.add(Ball(Colors.black, [100, 100], [0, 1]));
+    });
+    _createNextSpawnTimer();
+  }
+
+  List<Widget> _renderObjects() {
+    List<Widget> ballWidgets = _balls.map((ball) => Positioned(
+      left:ball.position[0],
+      top: ball.position[1],
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: ball.color,
+        ),
+      )
+    )).toList();
+
+    return [...ballWidgets];
+  }
+
+  Size _getScreenSize() => MediaQuery.of(context).size;
+
+}
+
+class Ball {
+  Color color = Colors.black;
+  List<double> position = [0.0, 0.0];
+  List<double> velocity = [0.0, 0.0];
+  Ball(this.color, this.position, this.velocity);
+
+  void updatePosition() {
+    position[0] += velocity[0];
+    position[1] += velocity[1];
   }
 }
