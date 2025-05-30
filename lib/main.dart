@@ -159,8 +159,10 @@ class _GamePlayState extends State<GamePlay>
   }
 
   void _updateSpawnTimer(double deltaTime) {
+    print(deltaTime);
     _nextBallSpawnTime -= deltaTime;
-    if (_nextBallSpawnTime <= 0) {
+    print('nextBallSpawnTime: $_nextBallSpawnTime');
+    if (_nextBallSpawnTime <= 0.0) {
       _spawnBall();
       _nextBallSpawnTime =
           1000 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300).toDouble();
@@ -220,8 +222,11 @@ class _GamePlayState extends State<GamePlay>
     setState(() {
       _isPaused = !_isPaused;
       if (_isPaused) {
+        print('pause');
         ticker.stop();
+        _lastTickTime = null;
       } else {
+        print('resume');
         ticker.start();
       }
     });
