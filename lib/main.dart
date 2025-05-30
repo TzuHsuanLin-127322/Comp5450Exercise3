@@ -18,21 +18,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const GamePlay(title: 'Game Page'),
@@ -42,16 +27,6 @@ class MyApp extends StatelessWidget {
 
 class GamePlay extends StatefulWidget {
   const GamePlay({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -61,14 +36,10 @@ class GamePlay extends StatefulWidget {
 class _GamePlayState extends State<GamePlay>
     with SingleTickerProviderStateMixin {
   int _score = 0;
-  // TODO: Lock bucket y position, and change x position based on input
   double bucketX = 0.0;
   double bucketWidth = 100.0;
   double bucketHeight = 10.0;
 
-  // TODO: Ball list to remember the state of all the balls
-  // TODO: Timers to create ball
-  // TODO: Add ticker for ball movement
   List<Ball> _balls = [];
   late Timer _ballSpawnTimer;
   late Ticker ticker;
@@ -97,13 +68,15 @@ class _GamePlayState extends State<GamePlay>
       body: Column(
         children: [
           Row(children: [Text('Score: $_score')]),
-          Expanded(child: 
-            GestureDetector(
-            onHorizontalDragUpdate: _onHorizontalDragUpdate,
-            child: Stack(
-              children: [
-                Positioned.fill(child: Container(color: Colors.transparent)), // Make gesture work on all part of the map.
-                ..._renderObjects(),
+          Expanded(
+            child: GestureDetector(
+              onHorizontalDragUpdate: _onHorizontalDragUpdate,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Container(color: Colors.transparent),
+                  ), // Make gesture work on all part of the map.
+                  ..._renderObjects(),
                 ],
               ),
             ),
@@ -122,19 +95,29 @@ class _GamePlayState extends State<GamePlay>
 
   void _onTick(Duration duration) {
     print('ticker._onTick');
+    double screenHeight = _getScreenSize().height;
+    double bucketTop = screenHeight * 0.9;
+    double bucketLeft = bucketX;
+    double bucketRight = bucketX + bucketWidth;
     setState(() {
       for (var ball in _balls) {
         ball.updatePosition();
         // TODO: Check collision with bucket, if so, remove ball add score
-        if ((ball.position[1] >= _getScreenSize().height * 0.9)
-          && (ball.position[0] > bucketX)
-          && (ball.position[0] < bucketX + bucketWidth)
-        ) {
+        double previousBallBottom = ball.previousPosition[1] + ball.size[1];
+        double currentBallBottom = ball.position[1] + ball.size[1];
+        bool ballBottomCrossBucketTop = (
+          previousBallBottom <= bucketTop && currentBallBottom > bucketTop
+        );
+        double ballLeft = ball.position[0];
+        double ballRight = ballLeft + ball.size[0];
+        bool ballTouchBucketSide = (
+          bucketLeft < ballRight && bucketRight > ballLeft
+        );
+        if (ballBottomCrossBucketTop && ballTouchBucketSide) {
           _score++;
           _balls.remove(ball);
         }
-        // TODO: Check if ball is out of bounds, if so, remove ball
-        if (ball.position[1] > _getScreenSize().height) {
+        if (ball.position[1] > screenHeight) {
           _balls.remove(ball);
         }
       }
@@ -166,8 +149,8 @@ class _GamePlayState extends State<GamePlay>
             left: ball.position[0],
             top: ball.position[1],
             child: Container(
-              width: 10,
-              height: 10,
+              width: ball.size[0],
+              height: ball.size[1],
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: ball.color,
@@ -191,7 +174,11 @@ class _GamePlayState extends State<GamePlay>
 
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
     setState(() {
-      bucketX = clampDouble(bucketX + details.delta.dx, 0, _getScreenSize().width - bucketWidth);
+      bucketX = clampDouble(
+        bucketX + details.delta.dx,
+        0,
+        _getScreenSize().width - bucketWidth,
+      );
     });
   }
 
@@ -200,11 +187,15 @@ class _GamePlayState extends State<GamePlay>
 
 class Ball {
   Color color = Colors.black;
+  List<double> previousPosition = [0.0, 0.0];
   List<double> position = [0.0, 0.0];
   List<double> velocity = [0.0, 0.0];
+  List<double> size = [10.0, 10.0];
   Ball(this.color, this.position, this.velocity);
 
   void updatePosition() {
+    previousPosition[0] = position[0];
+    previousPosition[1] = position[1];
     position[0] += velocity[0];
     position[1] += velocity[1];
   }
