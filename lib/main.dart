@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -57,12 +58,13 @@ class GamePlay extends StatefulWidget {
   State<GamePlay> createState() => _GamePlayState();
 }
 
-class _GamePlayState extends State<GamePlay> with SingleTickerProviderStateMixin {
+class _GamePlayState extends State<GamePlay>
+    with SingleTickerProviderStateMixin {
+  int _score = 0;
   // TODO: Lock bucket y position, and change x position based on input
   double bucketX = 0.0;
   double bucketWidth = 100.0;
   double bucketHeight = 10.0;
-
 
   // TODO: Ball list to remember the state of all the balls
   // TODO: Timers to create ball
@@ -73,11 +75,14 @@ class _GamePlayState extends State<GamePlay> with SingleTickerProviderStateMixin
 
   final Random _rng = Random();
 
-
-  @override void initState() {
+  @override
+  void initState() {
     print('initState');
     // TODO: implement initState
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      bucketX = (_getScreenSize().width - bucketWidth) / 2;
+    });
     // TODO: Ticker, update state of ball, check for collision with bucket
     ticker = Ticker(_onTick);
     ticker.start();
@@ -88,15 +93,22 @@ class _GamePlayState extends State<GamePlay> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: GestureDetector(
-        onHorizontalDragUpdate: (details) {
-        },
-        child: Stack(
-          children: _renderObjects(),
-        ),
+      appBar: AppBar(title: Text(widget.title)),
+      body: Column(
+        children: [
+          Row(children: [Text('Score: $_score')]),
+          Expanded(child: 
+            GestureDetector(
+            onHorizontalDragUpdate: _onHorizontalDragUpdate,
+            child: Stack(
+              children: [
+                Positioned.fill(child: Container(color: Colors.transparent)),
+                ..._renderObjects(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -115,42 +127,68 @@ class _GamePlayState extends State<GamePlay> with SingleTickerProviderStateMixin
         ball.updatePosition();
         // TODO: Check collision with bucket, if so, remove ball add score
         // TODO: Check if ball is out of bounds, if so, remove ball
+        if (ball.position[1] > _getScreenSize().height) {
+          _balls.remove(ball);
+        }
       }
     });
   }
 
   void _createNextSpawnTimer() {
-    int nextTime = 500 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300);
+    int nextTime = 1000 + (_rng.nextBool() ? 1 : -1) * _rng.nextInt(300);
     _ballSpawnTimer = Timer(Duration(milliseconds: nextTime), _onSpawnTimer);
   }
 
   void _onSpawnTimer() {
     print('ballSpawnTimer');
     setState(() {
-      _balls.add(Ball(Colors.black, [100, 100], [0, 1]));
+      double ballWidth = 10;
+      double x = _rng.nextDouble() * (_getScreenSize().width - ballWidth);
+      double speed = 1 + (_rng.nextBool() ? 1 : -1) * (_rng.nextDouble() / 2);
+      _balls.add(
+        Ball(Colors.black, [x, 0.05 * _getScreenSize().height], [0, speed]),
+      );
     });
     _createNextSpawnTimer();
   }
 
   List<Widget> _renderObjects() {
-    List<Widget> ballWidgets = _balls.map((ball) => Positioned(
-      left:ball.position[0],
-      top: ball.position[1],
+    List<Widget> ballWidgets = _balls
+        .map(
+          (ball) => Positioned(
+            left: ball.position[0],
+            top: ball.position[1],
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: ball.color,
+              ),
+            ),
+          ),
+        )
+        .toList();
+    Widget bucket = Positioned(
+      left: bucketX,
+      top: _getScreenSize().height * 0.9,
       child: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: ball.color,
-        ),
-      )
-    )).toList();
+        width: bucketWidth,
+        height: bucketHeight,
+        color: Colors.blue,
+      ),
+    );
 
-    return [...ballWidgets];
+    return [...ballWidgets, bucket];
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      bucketX = clampDouble(bucketX + details.delta.dx, 0, _getScreenSize().width - bucketWidth);
+    });
   }
 
   Size _getScreenSize() => MediaQuery.of(context).size;
-
 }
 
 class Ball {
