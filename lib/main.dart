@@ -102,7 +102,7 @@ class _GamePlayState extends State<GamePlay>
             onHorizontalDragUpdate: _onHorizontalDragUpdate,
             child: Stack(
               children: [
-                Positioned.fill(child: Container(color: Colors.transparent)),
+                Positioned.fill(child: Container(color: Colors.transparent)), // Make gesture work on all part of the map.
                 ..._renderObjects(),
                 ],
               ),
@@ -126,6 +126,13 @@ class _GamePlayState extends State<GamePlay>
       for (var ball in _balls) {
         ball.updatePosition();
         // TODO: Check collision with bucket, if so, remove ball add score
+        if ((ball.position[1] >= _getScreenSize().height * 0.9)
+          && (ball.position[0] > bucketX)
+          && (ball.position[0] < bucketX + bucketWidth)
+        ) {
+          _score++;
+          _balls.remove(ball);
+        }
         // TODO: Check if ball is out of bounds, if so, remove ball
         if (ball.position[1] > _getScreenSize().height) {
           _balls.remove(ball);
