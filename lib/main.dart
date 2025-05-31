@@ -32,12 +32,17 @@ class GamePlay extends StatefulWidget {
   @override
   State<GamePlay> createState() => _GamePlayState();
 }
+
+enum GameState { start, play }
 const int MAX_LIVES = 3;
 const double BALL_SIZE = 30.0;
+
+
 class _GamePlayState extends State<GamePlay>
     with SingleTickerProviderStateMixin {
 
-  late Ticker ticker;
+  GameState _gameState = GameState.start;
+  late Ticker _ticker;
 
   bool _isPaused = false;
   int _score = 0;
@@ -62,15 +67,53 @@ class _GamePlayState extends State<GamePlay>
       bucketX = (_getScreenSize().width - bucketWidth) / 2;
     });
     // TODO: Ticker, update state of ball, check for collision with bucket
-    ticker = Ticker(_onTick);
-    ticker.start();
+    _ticker = Ticker(_onTick);
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget body = Container();
+    if (_gameState == GameState.start) {
+      body = _renderStartScreen();
+    } else if (_gameState == GameState.play) {
+      body = _renderGameplay();
+    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
-      body: Column(
+      body: body,
+    );
+  }
+
+  Widget _renderStartScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('Tap to Start', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('Drag horizontally to catch the ball, you lose if you miss three times', style: TextStyle(fontSize: 16)),
+          SizedBox(height: 20),
+          ElevatedButton(
+            child: Text('Start'),
+            onPressed: () => setState(() => _startGame()),
+          )
+        ],
+      )
+    );
+  }
+
+  void _startGame() {
+    setState(() {
+      _gameState = GameState.play;
+      _isPaused = false;
+      _score = 0;
+      _lives = MAX_LIVES;
+      _balls.clear();
+      _ticker.start();
+    });
+  }
+
+  Widget _renderGameplay() {
+    return Column(
         children: [
           Padding(
             padding: EdgeInsets.all(16),
@@ -111,13 +154,12 @@ class _GamePlayState extends State<GamePlay>
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   @override
   void dispose() {
-    ticker.dispose();
+    _ticker.dispose();
     super.dispose();
   }
 
@@ -234,10 +276,10 @@ class _GamePlayState extends State<GamePlay>
     setState(() {
       _isPaused = !_isPaused;
       if (_isPaused) {
-        ticker.stop();
+        _ticker.stop();
         _lastTickTime = null;
       } else {
-        ticker.start();
+        _ticker.start();
       }
     });
   }
@@ -247,7 +289,7 @@ class _GamePlayState extends State<GamePlay>
       return;
     }
     _isPaused = true;
-    ticker.stop();
+    _ticker.stop();
     _lastTickTime = null;
     showDialog(context: context, builder:(context) => AlertDialog(
       title: Text('Game Over'),
@@ -257,6 +299,14 @@ class _GamePlayState extends State<GamePlay>
           child: Text('Play Again'),
           onPressed: () {
             _resetGame();
+            Navigator.of(context).pop();
+          }
+        ),
+        TextButton(
+          child: Text('Quit'),
+          onPressed: () {
+            _resetGame();
+            _gameState = GameState.start;
             Navigator.of(context).pop();
           }
         )
@@ -272,7 +322,7 @@ class _GamePlayState extends State<GamePlay>
       _nextBallSpawnTime = 0.0;
       _lastTickTime = null;
       _isPaused = false;
-      ticker.start();
+      _ticker.stop();
     });
   }
 
