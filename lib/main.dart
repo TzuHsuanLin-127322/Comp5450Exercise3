@@ -180,6 +180,7 @@ class _GamePlayState extends State<GamePlay>
     double bucketTop = _gameAreaSize.maxHeight * 0.9;
     double bucketLeft = bucketX;
     double bucketRight = bucketX + bucketWidth;
+    List<Ball> ballsToRemove = [];
     for (var ball in _balls) {
       ball.updatePosition();
       // TODO: Check collision with bucket, if so, remove ball add score
@@ -195,14 +196,17 @@ class _GamePlayState extends State<GamePlay>
       if (ballBottomCrossBucketTop && ballTouchBucketSide) {
         _score++;
         _lives = MAX_LIVES;
-        _balls.remove(ball);
+        ballsToRemove.add(ball);
       }
       // Ball out of screen
       if (ball.position[1] > _gameAreaSize.maxHeight) {
-        _balls.remove(ball);
+        ballsToRemove.add(ball);
         _lives--;
         _checkGameOver();
       }
+    }
+    for (var ball in ballsToRemove) {
+      _balls.remove(ball);
     }
   }
 
@@ -299,6 +303,7 @@ class _GamePlayState extends State<GamePlay>
           child: Text('Play Again'),
           onPressed: () {
             _resetGame();
+            _ticker.start();
             Navigator.of(context).pop();
           }
         ),
